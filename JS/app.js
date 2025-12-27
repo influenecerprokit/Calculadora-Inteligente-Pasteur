@@ -388,23 +388,126 @@ class CalculadoraApp {
 
     // Función centralizada para crear utterances con voz humanizada
     createHumanizedUtterance(text, rate = 0.88, pitch = 1.2) {
+        // Detectar si es dispositivo móvil
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'es-ES';
-        utterance.rate = rate; // Velocidad más lenta y natural (0.88 es más humanizado que 0.95)
-        utterance.pitch = pitch; // Pitch más natural (1.2 es más humanizado que 1.5-1.6)
+        
+        // Mismo ritmo y tiempo para móviles y PC
+        utterance.rate = rate; // Velocidad más lenta y natural (0.88 es más humanizado que 0.95) - MISMO PARA MÓVILES Y PC
+        utterance.pitch = pitch; // Pitch más natural (1.2 es más humanizado que 1.5-1.6) - MISMO PARA MÓVILES Y PC
         utterance.volume = 1.0;
         
-        // Usar la voz centralizada
-        const spanishVoice = this.selectVoice();
+        // Seleccionar voz profesional para móviles
         const voices = speechSynthesis.getVoices();
         
-        if (spanishVoice) {
-            utterance.voice = spanishVoice;
-        } else if (voices.length > 0) {
-            utterance.voice = voices[0];
+        if (isMobile) {
+            // Para móviles: buscar voces más profesionales
+            const professionalVoice = this.selectProfessionalVoice(voices);
+            if (professionalVoice) {
+                utterance.voice = professionalVoice;
+                console.log('📱 Usando voz profesional para móvil:', professionalVoice.name);
+            } else {
+                // Usar la voz centralizada como fallback
+                const spanishVoice = this.selectVoice();
+                if (spanishVoice) {
+                    utterance.voice = spanishVoice;
+                } else if (voices.length > 0) {
+                    utterance.voice = voices[0];
+                }
+            }
+        } else {
+            // Para desktop: usar la voz centralizada normal
+            const spanishVoice = this.selectVoice();
+            if (spanishVoice) {
+                utterance.voice = spanishVoice;
+            } else if (voices.length > 0) {
+                utterance.voice = voices[0];
+            }
         }
         
         return utterance;
+    }
+    
+    // Seleccionar voz profesional para móviles
+    selectProfessionalVoice(voices) {
+        if (voices.length === 0) {
+            return null;
+        }
+        
+        // Prioridad 1: Voces premium/profesionales por nombre
+        const premiumVoices = voices.filter(voice => 
+            voice.lang.startsWith('es') && (
+                voice.name.toLowerCase().includes('premium') ||
+                voice.name.toLowerCase().includes('enhanced') ||
+                voice.name.toLowerCase().includes('neural') ||
+                voice.name.toLowerCase().includes('natural') ||
+                voice.name.toLowerCase().includes('professional') ||
+                voice.name.toLowerCase().includes('quality')
+            )
+        );
+        
+        if (premiumVoices.length > 0) {
+            console.log('✅ Voz premium encontrada:', premiumVoices[0].name);
+            return premiumVoices[0];
+        }
+        
+        // Prioridad 2: Voces con mejor calidad (Google, Microsoft, Apple)
+        const qualityVoices = voices.filter(voice => 
+            voice.lang.startsWith('es') && (
+                voice.name.toLowerCase().includes('google') ||
+                voice.name.toLowerCase().includes('microsoft') ||
+                voice.name.toLowerCase().includes('apple') ||
+                voice.name.toLowerCase().includes('siri') ||
+                voice.name.toLowerCase().includes('cortana')
+            )
+        );
+        
+        if (qualityVoices.length > 0) {
+            console.log('✅ Voz de calidad encontrada:', qualityVoices[0].name);
+            return qualityVoices[0];
+        }
+        
+        // Prioridad 3: Voces femeninas profesionales (generalmente más claras)
+        const professionalFemaleVoices = voices.filter(voice => 
+            voice.lang.startsWith('es') && (
+                voice.name.toLowerCase().includes('maria') ||
+                voice.name.toLowerCase().includes('mujer') ||
+                voice.name.toLowerCase().includes('female') ||
+                voice.name.toLowerCase().includes('español') ||
+                voice.name.toLowerCase().includes('spanish')
+            )
+        );
+        
+        if (professionalFemaleVoices.length > 0) {
+            console.log('✅ Voz femenina profesional encontrada:', professionalFemaleVoices[0].name);
+            return professionalFemaleVoices[0];
+        }
+        
+        // Prioridad 4: Cualquier voz masculina profesional
+        const professionalMaleVoices = voices.filter(voice => 
+            voice.lang.startsWith('es') && (
+                voice.name.toLowerCase().includes('diego') ||
+                voice.name.toLowerCase().includes('pablo') ||
+                voice.name.toLowerCase().includes('hombre') ||
+                voice.name.toLowerCase().includes('male')
+            )
+        );
+        
+        if (professionalMaleVoices.length > 0) {
+            console.log('✅ Voz masculina profesional encontrada:', professionalMaleVoices[0].name);
+            return professionalMaleVoices[0];
+        }
+        
+        // Fallback: Primera voz en español disponible
+        const spanishVoices = voices.filter(voice => voice.lang.startsWith('es'));
+        if (spanishVoices.length > 0) {
+            console.log('✅ Usando primera voz en español disponible:', spanishVoices[0].name);
+            return spanishVoices[0];
+        }
+        
+        return null;
     }
 
     // Crear utterance con voz masculina humanizada (solo para advertencias)
@@ -639,12 +742,19 @@ class CalculadoraApp {
                     console.log('✅ "¡Hola!" completado, esperando 1 segundo en silencio...');
                     // Pausa de 1 segundo en silencio después de "¡Hola!"
                     setTimeout(() => {
-                        // Verificar que no se haya cancelado
-                        if (this.isNarrating) {
-                            // Continuar con el texto principal
-                            this.currentUtterance = utterance;
-                            speechSynthesis.speak(utterance);
-                            console.log('🎤 Continuando con texto principal...');
+                        // Verificar que no se haya cancelado y que no haya otra narración en curso
+                        if (this.isNarrating && !speechSynthesis.speaking && !speechSynthesis.pending) {
+                            // Cancelar cualquier narración residual antes de continuar
+                            speechSynthesis.cancel();
+                            // Pequeña pausa adicional para asegurar que se canceló completamente
+                            setTimeout(() => {
+                                if (this.isNarrating && !speechSynthesis.speaking && !speechSynthesis.pending) {
+                                    // Continuar con el texto principal
+                                    this.currentUtterance = utterance;
+                                    speechSynthesis.speak(utterance);
+                                    console.log('🎤 Continuando con texto principal...');
+                                }
+                            }, 150);
                         }
                     }, 1000);
                 };
@@ -661,10 +771,23 @@ class CalculadoraApp {
                 // Evento de error para "¡Hola!"
                 helloUtterance.onerror = (event) => {
                     console.error('❌ Error en "¡Hola!":', event.error);
-                    // Continuar con el texto principal de todas formas
+                    // Continuar con el texto principal de todas formas, pero asegurando que no haya sobreposiciones
                     setTimeout(() => {
-                        this.currentUtterance = utterance;
-                        speechSynthesis.speak(utterance);
+                        // Cancelar cualquier narración residual
+                        if (speechSynthesis.speaking || speechSynthesis.pending) {
+                            speechSynthesis.cancel();
+                            setTimeout(() => {
+                                if (this.isNarrating && !speechSynthesis.speaking && !speechSynthesis.pending) {
+                                    this.currentUtterance = utterance;
+                                    speechSynthesis.speak(utterance);
+                                }
+                            }, 150);
+                        } else {
+                            if (this.isNarrating) {
+                                this.currentUtterance = utterance;
+                                speechSynthesis.speak(utterance);
+                            }
+                        }
                     }, 1000);
                 };
 
@@ -691,11 +814,14 @@ class CalculadoraApp {
                     // Asegurarse de que no haya nada hablando antes de iniciar
                     if (speechSynthesis.speaking || speechSynthesis.pending) {
                         speechSynthesis.cancel();
-                        // Esperar un momento antes de iniciar
+                        // Esperar un momento antes de iniciar para evitar solapamiento (aumentado para móviles)
                         setTimeout(() => {
-                            speechSynthesis.speak(helloUtterance);
-                            console.log('🎤 Comando speak() ejecutado para "¡Hola!" (después de cancelar)');
-                        }, 100);
+                            // Verificar nuevamente que no haya nada hablando
+                            if (!speechSynthesis.speaking && !speechSynthesis.pending && this.isNarrating) {
+                                speechSynthesis.speak(helloUtterance);
+                                console.log('🎤 Comando speak() ejecutado para "¡Hola!" (después de cancelar)');
+                            }
+                        }, 200);
                     } else {
                         speechSynthesis.speak(helloUtterance);
                         console.log('🎤 Comando speak() ejecutado para "¡Hola!"');
@@ -808,6 +934,7 @@ class CalculadoraApp {
                 }
 
                 // Texto completo a leer con lógica de género y plural
+                // NOTA: NO incluir saludo "Hola" aquí, ya se dijo en la pantalla de bienvenida
                 const nameInfo = this.getUserNameInfo();
                 let rulesText;
                 if (nameInfo.isPlural) {
@@ -847,10 +974,14 @@ class CalculadoraApp {
                 try {
                     if (speechSynthesis.speaking || speechSynthesis.pending) {
                         speechSynthesis.cancel();
+                        // Esperar un momento antes de iniciar para evitar solapamiento (aumentado para móviles)
                         setTimeout(() => {
-                            speechSynthesis.speak(utterance);
-                            console.log('🎤 Comando speak() ejecutado para reglas (después de cancelar)');
-                        }, 100);
+                            // Verificar nuevamente que no haya nada hablando
+                            if (!speechSynthesis.speaking && !speechSynthesis.pending && this.isNarrating) {
+                                speechSynthesis.speak(utterance);
+                                console.log('🎤 Comando speak() ejecutado para reglas (después de cancelar)');
+                            }
+                        }, 200);
                     } else {
                         speechSynthesis.speak(utterance);
                         console.log('🎤 Comando speak() ejecutado para reglas');
@@ -1760,8 +1891,10 @@ class CalculadoraApp {
         // Si entramos a la pantalla de reglas (tercera pantalla), actualizar textos y iniciar narración automáticamente (solo una vez)
         if (screenName === 'rules' && !this.rulesNarrationPlayed) {
             console.log('🎤 Entrando a pantalla de reglas, actualizando textos e iniciando narración automáticamente...');
+            // IMPORTANTE: Detener cualquier narración de bienvenida que pueda estar reproduciéndose
+            this.stopWelcomeNarration();
             this.setupRulesScreen();
-            // Esperar un momento para que la pantalla se muestre completamente
+            // Esperar un momento para que la pantalla se muestre completamente y asegurar que la narración anterior se detuvo
             setTimeout(() => {
                 this.startRulesNarration();
             }, 500);
@@ -1773,7 +1906,11 @@ class CalculadoraApp {
         }
         
         // Si salimos de la pantalla de bienvenida, detener la narración
-        if (screenName !== 'welcome' && screenName !== 'initial-welcome' && screenName !== 'rules') {
+        // IMPORTANTE: Detener la narración de bienvenida cuando entramos a reglas para evitar que se solape
+        if (screenName === 'rules') {
+            // Detener cualquier narración de bienvenida que pueda estar reproduciéndose
+            this.stopWelcomeNarration();
+        } else if (screenName !== 'welcome' && screenName !== 'initial-welcome') {
             this.stopWelcomeNarration();
         }
         
@@ -6242,29 +6379,85 @@ class CalculadoraApp {
                 doc.text(String(finalPhrase3), margin, yPosition);
             }
 
-            // Guardar PDF
+            // Guardar PDF - Método compatible con móviles y tablets
             console.log('💾 Guardando PDF...');
             const fileName = `Resumen_Gastos_${new Date().toISOString().split('T')[0]}.pdf`;
             
-            // Verificar que el método save exista
-            if (typeof doc.save !== 'function') {
-                console.error('❌ El método save no está disponible en el documento');
-                alert('Error: No se puede guardar el PDF. Por favor, intente nuevamente.');
-                return;
-            }
+            // Detectar si es dispositivo móvil o tablet
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
             
-            // Intentar guardar el PDF
             try {
-                doc.save(fileName);
-                console.log('✅ PDF descargado correctamente:', fileName);
-                
-                // Mostrar mensaje de confirmación
-                setTimeout(() => {
-                    console.log('✅ Descarga de PDF completada exitosamente');
-                }, 100);
+                if (isMobile || isIOS) {
+                    // Método para móviles: usar blob y enlace de descarga
+                    console.log('📱 Detectado dispositivo móvil, usando método compatible...');
+                    
+                    // Generar el PDF como blob
+                    const pdfBlob = doc.output('blob');
+                    
+                    // Crear URL del blob
+                    const blobUrl = URL.createObjectURL(pdfBlob);
+                    
+                    // Crear enlace de descarga temporal
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = blobUrl;
+                    downloadLink.download = fileName;
+                    downloadLink.style.display = 'none';
+                    
+                    // Agregar al DOM, hacer clic y remover
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    
+                    // Limpiar después de un delay
+                    setTimeout(() => {
+                        document.body.removeChild(downloadLink);
+                        URL.revokeObjectURL(blobUrl);
+                        console.log('✅ PDF descargado correctamente en móvil:', fileName);
+                    }, 100);
+                    
+                    // Mostrar mensaje de confirmación para móviles
+                    setTimeout(() => {
+                        alert('✅ PDF descargado correctamente. Revisa tu carpeta de descargas.');
+                    }, 500);
+                } else {
+                    // Método estándar para desktop
+                    if (typeof doc.save !== 'function') {
+                        console.error('❌ El método save no está disponible en el documento');
+                        alert('Error: No se puede guardar el PDF. Por favor, intente nuevamente.');
+                        return;
+                    }
+                    
+                    doc.save(fileName);
+                    console.log('✅ PDF descargado correctamente:', fileName);
+                    
+                    // Mostrar mensaje de confirmación
+                    setTimeout(() => {
+                        console.log('✅ Descarga de PDF completada exitosamente');
+                    }, 100);
+                }
             } catch (saveError) {
                 console.error('❌ Error al guardar PDF:', saveError);
-                alert('Error al guardar el PDF. Por favor, verifique la configuración de su navegador.');
+                
+                // Intentar método alternativo si falla el principal
+                try {
+                    console.log('🔄 Intentando método alternativo...');
+                    const pdfBlob = doc.output('blob');
+                    const blobUrl = URL.createObjectURL(pdfBlob);
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = blobUrl;
+                    downloadLink.download = fileName;
+                    downloadLink.style.display = 'none';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    setTimeout(() => {
+                        document.body.removeChild(downloadLink);
+                        URL.revokeObjectURL(blobUrl);
+                    }, 100);
+                    alert('✅ PDF descargado correctamente. Revisa tu carpeta de descargas.');
+                } catch (altError) {
+                    console.error('❌ Error en método alternativo:', altError);
+                    alert('Error al guardar el PDF. Por favor, verifique la configuración de su navegador o intente desde una computadora.');
+                }
             }
         } catch (error) {
             console.error('❌ Error al generar PDF:', error);
