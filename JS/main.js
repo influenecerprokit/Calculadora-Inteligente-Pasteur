@@ -1,0 +1,1210 @@
+/**
+ * Main Application Entry Point
+ * Initializes all modules and starts the Calculadora de Gastos game
+ */
+
+import { LazyLoader } from './LazyLoader.js';
+
+/**
+ * Application class that orchestrates the entire game
+ */
+class CalculadoraApp {
+    constructor() {
+        this.lazyLoader = null;
+        this.errorHandler = null;
+        this.cacheManager = null;
+        this.audioSystem = null;
+        this.gameEngine = null;
+        this.mobileTestSuite = null;
+        this.browserCompatibilityTester = null;
+        this.isInitialized = false;
+        this.initializationAttempts = 0;
+        this.maxInitializationAttempts = 3;
+        
+        // Bind methods
+        this.handleUnload = this.handleUnload.bind(this);
+        this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+    }
+
+    /**
+     * Initialize the application
+     */
+    async init() {
+        this.initializationAttempts++;
+        
+        try {
+            console.log(`🎮 Inicializando Calculadora de Gastos... (Intento ${this.initializationAttempts})`);
+            
+            // Show loading overlay
+            this.showLoading(true);
+            
+            // Initialize lazy loader first
+            this.lazyLoader = new LazyLoader();
+            const lazyLoaderSuccess = this.lazyLoader.init();
+            
+            if (!lazyLoaderSuccess) {
+                throw new Error('LazyLoader initialization failed');
+            }
+            
+            // Preload critical modules (ErrorHandler, UIController, CacheManager)
+            try {
+                await this.lazyLoader.preloadCriticalModules();
+            } catch (error) {
+                console.error('❌ Error preloading critical modules:', error);
+                throw new Error(`Failed to preload critical modules: ${error.message}`);
+            }
+            
+            // Get critical modules from lazy loader
+            this.errorHandler = this.lazyLoader.getLoadedModule('ErrorHandler');
+            this.uiController = this.lazyLoader.getLoadedModule('UIController');
+            this.cacheManager = this.lazyLoader.getLoadedModule('CacheManager');
+            
+            console.log('📦 Loaded modules check:', {
+                errorHandler: !!this.errorHandler,
+                uiController: !!this.uiController,
+                cacheManager: !!this.cacheManager
+            });
+            
+            if (!this.errorHandler) {
+                throw new Error('ErrorHandler not loaded by LazyLoader - check console for module loading errors');
+            }
+            
+            if (!this.uiController) {
+                throw new Error('UIController not loaded by LazyLoader - check console for module loading errors');
+            }
+            
+            // CacheManager is optional, warn but don't fail
+            if (!this.cacheManager) {
+                console.warn('⚠️ CacheManager not loaded - continuing without cache');
+            }
+            
+            // Initialize critical modules
+            console.log('🔄 Initializing critical modules...');
+            
+            // Initialize ErrorHandler first (needed for error reporting)
+            try {
+                if (!this.errorHandler.isInitialized) {
+                    const errorHandlerInit = this.errorHandler.init();
+                    if (!errorHandlerInit) {
+                        throw new Error('ErrorHandler initialization returned false');
+                    }
+                    console.log('✅ ErrorHandler initialized');
+                }
+            } catch (error) {
+                console.error('❌ ErrorHandler initialization error:', error);
+                throw new Error(`ErrorHandler initialization failed: ${error.message}`);
+            }
+            
+            // Initialize UIController (ensure DOM is ready)
+            try {
+                if (!this.uiController.isInitialized) {
+                    // Wait for DOM to be ready if needed
+                    if (document.readyState === 'loading') {
+                        await new Promise(resolve => {
+                            if (document.readyState === 'complete') {
+                                resolve();
+                            } else {
+                                const checkReady = () => {
+                                    if (document.readyState !== 'loading') {
+                                        resolve();
+                                    } else {
+                                        setTimeout(checkReady, 10);
+                                    }
+                                };
+                                checkReady();
+                            }
+                        });
+                    }
+                    
+                    const uiControllerInit = this.uiController.init();
+                    if (!uiControllerInit) {
+                        throw new Error('UIController initialization returned false');
+                    }
+                    console.log('✅ UIController initialized');
+                }
+            } catch (error) {
+                console.error('❌ UIController initialization error:', error);
+                throw new Error(`UIController initialization failed: ${error.message}`);
+            }
+            
+            // Initialize CacheManager if it has init method (optional)
+            if (this.cacheManager && typeof this.cacheManager.init === 'function' && !this.cacheManager.isInitialized) {
+                try {
+                    const cacheManagerInit = this.cacheManager.init();
+                    if (!cacheManagerInit) {
+                        console.warn('⚠️ CacheManager initialization returned false, continuing without cache');
+                    } else {
+                        console.log('✅ CacheManager initialized');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ CacheManager initialization error, continuing without cache:', error);
+                }
+            }
+            
+            console.log('✅ Critical modules initialized successfully');
+            
+            // Initialize modules with lazy loading
+            try {
+                await this.initializeModulesWithLazyLoading();
+            } catch (error) {
+                console.error('❌ Error initializing modules:', error);
+                // If GameEngine is critical and failed, throw
+                if (!this.gameEngine) {
+                    throw new Error(`Failed to initialize GameEngine: ${error.message}`);
+                }
+                // Otherwise, log but continue
+                console.warn('⚠️ Some modules failed to initialize, continuing with available modules');
+            }
+            
+            // Initialize optional modules (mobile test suite, browser compatibility)
+            // These are optional, so don't fail if they error
+            try {
+                await this.initializeOptionalModules();
+            } catch (error) {
+                console.warn('⚠️ Optional modules initialization failed (non-critical):', error);
+            }
+            
+            // Set up application event listeners
+            this.setupApplicationEventListeners();
+            
+            this.isInitialized = true;
+            
+            // Hide loading overlay
+            this.showLoading(false);
+            
+            console.log('✅ Aplicación inicializada correctamente');
+            
+            // Report successful initialization
+            this.errorHandler.reportInfo('Aplicación inicializada correctamente', {
+                attempt: this.initializationAttempts,
+                modules: this.getModuleStatus(),
+                lazyLoadingStats: this.lazyLoader.getLoadingStats()
+            });
+            
+        } catch (error) {
+            console.error('❌ Error inicializando la aplicación:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+                attempt: this.initializationAttempts
+            });
+            await this.handleInitializationError(error);
+        }
+    }
+
+    /**
+     * Initialize all application modules using lazy loading
+     */
+    async initializeModulesWithLazyLoading() {
+        // Load high priority modules first
+        console.log('🔄 Loading high priority modules...');
+        try {
+            await this.lazyLoader.loadModulesByPriority('high');
+        } catch (error) {
+            console.error('❌ Error loading high priority modules:', error);
+            throw error;
+        }
+        
+        // Get high priority modules
+        this.audioSystem = this.lazyLoader.getLoadedModule('AudioSystem');
+        this.gameEngine = this.lazyLoader.getLoadedModule('GameEngine');
+        
+        // Initialize high priority modules
+        if (this.audioSystem && typeof this.audioSystem.init === 'function' && !this.audioSystem.isInitialized) {
+            try {
+                await this.audioSystem.init();
+                console.log('✅ AudioSystem initialized');
+            } catch (error) {
+                console.warn('⚠️ AudioSystem initialization failed (non-critical):', error);
+                // Audio is optional, continue without it
+            }
+        }
+        
+        // Load medium priority modules
+        console.log('🔄 Loading medium priority modules...');
+        try {
+            await this.lazyLoader.loadModulesByPriority('medium');
+        } catch (error) {
+            console.error('❌ Error loading medium priority modules:', error);
+            // Some medium priority modules might fail, but we need at least CalculatorModule
+            if (!this.calculatorModule) {
+                throw new Error(`CalculatorModule is required but failed to load: ${error.message}`);
+            }
+        }
+        
+        // Get medium priority modules
+        this.dragDropHandler = this.lazyLoader.getLoadedModule('DragDropHandler');
+        this.timerManager = this.lazyLoader.getLoadedModule('TimerManager');
+        this.calculatorModule = this.lazyLoader.getLoadedModule('CalculatorModule');
+        this.dataStorage = this.lazyLoader.getLoadedModule('DataStorage');
+        
+        // Initialize medium priority modules
+        if (this.dragDropHandler && typeof this.dragDropHandler.init === 'function' && !this.dragDropHandler.isInitialized) {
+            try {
+                await this.dragDropHandler.init();
+                console.log('✅ DragDropHandler initialized');
+            } catch (error) {
+                console.warn('⚠️ DragDropHandler initialization failed:', error);
+            }
+        }
+        
+        if (this.timerManager && typeof this.timerManager.init === 'function' && !this.timerManager.isInitialized) {
+            try {
+                await this.timerManager.init();
+                console.log('✅ TimerManager initialized');
+            } catch (error) {
+                console.warn('⚠️ TimerManager initialization failed:', error);
+            }
+        }
+        
+        if (this.calculatorModule && typeof this.calculatorModule.init === 'function' && !this.calculatorModule.isInitialized) {
+            try {
+                await this.calculatorModule.init();
+                console.log('✅ CalculatorModule initialized');
+            } catch (error) {
+                console.error('❌ CalculatorModule initialization failed:', error);
+                throw new Error(`CalculatorModule initialization failed: ${error.message}`);
+            }
+        }
+        
+        if (this.dataStorage && typeof this.dataStorage.init === 'function' && !this.dataStorage.isInitialized) {
+            try {
+                await this.dataStorage.init();
+                console.log('✅ DataStorage initialized');
+            } catch (error) {
+                console.warn('⚠️ DataStorage initialization failed:', error);
+            }
+        }
+        
+        // Integrate CacheManager with modules that need it
+        if (this.calculatorModule && this.cacheManager) {
+            this.calculatorModule.setCacheManager(this.cacheManager);
+            console.log('🗄️ CacheManager integrated with CalculatorModule');
+        }
+        
+        if (this.dataStorage && this.cacheManager) {
+            // DataStorage can use cache for frequently accessed data
+            console.log('🗄️ CacheManager available for DataStorage optimization');
+        }
+        
+        // Load low priority modules (AnimationEngine)
+        console.log('🔄 Loading low priority modules...');
+        try {
+            await this.lazyLoader.loadModulesByPriority('low');
+        } catch (error) {
+            console.warn('⚠️ Error loading low priority modules (non-critical):', error);
+        }
+        
+        // Get low priority modules
+        this.animationEngine = this.lazyLoader.getLoadedModule('AnimationEngine');
+        
+        // Initialize low priority modules
+        if (this.animationEngine && typeof this.animationEngine.init === 'function' && !this.animationEngine.isInitialized) {
+            try {
+                await this.animationEngine.init();
+                console.log('✅ AnimationEngine initialized');
+            } catch (error) {
+                console.warn('⚠️ AnimationEngine initialization failed (non-critical):', error);
+            }
+        }
+        
+        // Verify critical modules are loaded
+        if (!this.uiController) {
+            throw new Error('UIController failed to load - critical module missing');
+        }
+        
+        if (!this.calculatorModule) {
+            throw new Error('CalculatorModule failed to load - critical module missing');
+        }
+        
+        console.log('✅ All core modules loaded successfully');
+        
+        // Now that all modules are loaded, recreate GameEngine with complete dependencies
+        // GameEngine was loaded early but needs all dependencies (medium and low priority)
+        if (this.gameEngine) {
+            // Destroy the incomplete GameEngine instance
+            try {
+                if (this.gameEngine.destroy) {
+                    this.gameEngine.destroy();
+                }
+                this.lazyLoader.unloadModule('GameEngine');
+            } catch (error) {
+                console.warn('⚠️ Error destroying old GameEngine:', error);
+            }
+        }
+        
+        // Recreate GameEngine with all dependencies
+        try {
+            const { GameEngine } = await import('./GameEngine.js');
+            const gameEngineDependencies = {
+                audioSystem: this.audioSystem || null,
+                dragDropHandler: this.dragDropHandler || null,
+                timerManager: this.timerManager || null,
+                animationEngine: this.animationEngine || null,
+                calculatorModule: this.calculatorModule, // Required
+                dataStorage: this.dataStorage || null,
+                uiController: this.uiController // Required
+            };
+            
+            console.log('🔧 Creating GameEngine with dependencies:', {
+                audioSystem: !!gameEngineDependencies.audioSystem,
+                dragDropHandler: !!gameEngineDependencies.dragDropHandler,
+                timerManager: !!gameEngineDependencies.timerManager,
+                animationEngine: !!gameEngineDependencies.animationEngine,
+                calculatorModule: !!gameEngineDependencies.calculatorModule,
+                dataStorage: !!gameEngineDependencies.dataStorage,
+                uiController: !!gameEngineDependencies.uiController
+            });
+            
+            this.gameEngine = new GameEngine(gameEngineDependencies);
+            const initResult = await this.gameEngine.init();
+            
+            if (!initResult) {
+                throw new Error('GameEngine.init() returned false');
+            }
+            
+            // Store in lazy loader cache
+            this.lazyLoader.loadedModules.set('GameEngine', this.gameEngine);
+            
+            console.log('✅ GameEngine recreated and initialized with all dependencies');
+        } catch (error) {
+            console.error('❌ Failed to recreate GameEngine:', error);
+            console.error('Error stack:', error.stack);
+            throw new Error(`GameEngine failed to initialize: ${error.message}`);
+        }
+        
+        // Warm up cache with common calculations
+        if (this.cacheManager && this.calculatorModule) {
+            this.cacheManager.warmUpCache();
+        }
+    }
+
+    /**
+     * Initialize optional modules (testing suites)
+     */
+    async initializeOptionalModules() {
+        try {
+            // Load optional modules on demand
+            console.log('🔄 Loading optional modules...');
+            
+            // Load MobileTestSuite if needed
+            if (this.shouldLoadMobileTestSuite()) {
+                this.mobileTestSuite = await this.lazyLoader.loadModule('MobileTestSuite');
+                await this.setupMobileTestSuite();
+            }
+            
+            // Load BrowserCompatibilityTester if needed
+            if (this.shouldLoadBrowserCompatibilityTester()) {
+                this.browserCompatibilityTester = await this.lazyLoader.loadModule('BrowserCompatibilityTester');
+                await this.setupBrowserCompatibilityTester();
+            }
+            
+        } catch (error) {
+            console.warn('Optional modules initialization failed:', error);
+            this.errorHandler?.reportWarning('Optional modules initialization failed', {
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Check if mobile test suite should be loaded
+     */
+    shouldLoadMobileTestSuite() {
+        // Load on mobile devices or when explicitly requested
+        return 'ontouchstart' in window || 
+               navigator.maxTouchPoints > 0 || 
+               window.location.search.includes('mobile-test=true');
+    }
+
+    /**
+     * Check if browser compatibility tester should be loaded
+     */
+    shouldLoadBrowserCompatibilityTester() {
+        // Load on desktop or when explicitly requested
+        return !('ontouchstart' in window) || 
+               window.location.search.includes('browser-test=true');
+    }
+
+    /**
+     * Setup mobile test suite after loading
+     */
+    async setupMobileTestSuite() {
+        if (!this.mobileTestSuite) return;
+        
+        try {
+            const success = await this.mobileTestSuite.init();
+            
+            if (success) {
+                console.log('✅ Mobile Test Suite initialized');
+                
+                // Auto-run quick mobile check
+                const quickCheck = await this.mobileTestSuite.quickMobileCheck();
+                
+                if (!quickCheck.compatible) {
+                    console.warn('⚠️ Mobile compatibility issues detected:', quickCheck.issues);
+                    
+                    // Report to error handler
+                    this.errorHandler?.reportWarning('Mobile compatibility issues detected', {
+                        issues: quickCheck.issues,
+                        deviceType: quickCheck.deviceType,
+                        touchSupport: quickCheck.touchSupport
+                    });
+                }
+                
+                // Make globally accessible for debugging
+                window.mobileTestSuite = this.mobileTestSuite;
+                
+                // Add keyboard shortcut to run tests (Ctrl+Shift+M)
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.shiftKey && e.key === 'M') {
+                        e.preventDefault();
+                        this.runMobileTests();
+                    }
+                });
+                
+                // Add mobile test button for touch devices
+                if (this.mobileTestSuite.deviceInfo.isMobile || this.mobileTestSuite.deviceInfo.isTablet) {
+                    this.addMobileTestButton();
+                }
+            }
+        } catch (error) {
+            console.warn('Mobile Test Suite setup failed:', error);
+            this.errorHandler?.reportWarning('Mobile Test Suite setup failed', {
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Setup browser compatibility tester after loading
+     */
+    async setupBrowserCompatibilityTester() {
+        if (!this.browserCompatibilityTester) return;
+        
+        try {
+            const success = await this.browserCompatibilityTester.init();
+            
+            if (success) {
+                console.log('✅ Browser Compatibility Tester initialized');
+                
+                // Auto-run quick compatibility check
+                const quickCheck = await this.browserCompatibilityTester.quickCompatibilityCheck();
+                
+                if (!quickCheck.compatible) {
+                    console.warn('⚠️ Browser compatibility issues detected:', quickCheck.issues);
+                    
+                    // Report to error handler
+                    this.errorHandler?.reportWarning('Browser compatibility issues detected', {
+                        issues: quickCheck.issues,
+                        warnings: quickCheck.warnings,
+                        browserInfo: quickCheck.browserInfo
+                    });
+                }
+                
+                // Make globally accessible for debugging
+                window.browserCompatibilityTester = this.browserCompatibilityTester;
+                
+                // Add keyboard shortcut to run full compatibility tests (Ctrl+Shift+B)
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+                        e.preventDefault();
+                        this.runBrowserCompatibilityTests();
+                    }
+                });
+                
+                // Add browser test button for desktop devices
+                if (this.browserCompatibilityTester.browserInfo.isDesktop) {
+                    this.addBrowserTestButton();
+                }
+            }
+        } catch (error) {
+            console.warn('Browser Compatibility Tester setup failed:', error);
+            this.errorHandler?.reportWarning('Browser Compatibility Tester setup failed', {
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Run mobile tests
+     */
+    async runMobileTests() {
+        if (!this.mobileTestSuite) {
+            // Load mobile test suite on demand if not already loaded
+            try {
+                this.mobileTestSuite = await this.lazyLoader.loadModule('MobileTestSuite');
+                await this.setupMobileTestSuite();
+            } catch (error) {
+                console.warn('Failed to load Mobile Test Suite on demand:', error);
+                return;
+            }
+        }
+        
+        console.log('🧪 Running mobile tests...');
+        
+        try {
+            await this.mobileTestSuite.runAllTests();
+            
+            // Report results to error handler
+            const summary = this.mobileTestSuite.generateTestSummary();
+            
+            if (summary.criticalFailures > 0) {
+                this.errorHandler?.reportWarning(`Mobile tests: ${summary.criticalFailures} critical failures`, {
+                    summary,
+                    deviceInfo: this.mobileTestSuite.deviceInfo
+                });
+            } else if (summary.failed > 0) {
+                this.errorHandler?.reportInfo(`Mobile tests: ${summary.failed} non-critical failures`, {
+                    summary
+                });
+            } else {
+                this.errorHandler?.reportInfo('All mobile tests passed', {
+                    summary
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error running mobile tests:', error);
+            this.errorHandler?.reportWarning('Mobile test execution failed', {
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Run browser compatibility tests
+     */
+    async runBrowserCompatibilityTests() {
+        if (!this.browserCompatibilityTester) {
+            // Load browser compatibility tester on demand if not already loaded
+            try {
+                this.browserCompatibilityTester = await this.lazyLoader.loadModule('BrowserCompatibilityTester');
+                await this.setupBrowserCompatibilityTester();
+            } catch (error) {
+                console.warn('Failed to load Browser Compatibility Tester on demand:', error);
+                return;
+            }
+        }
+        
+        console.log('🧪 Running browser compatibility tests...');
+        
+        try {
+            const results = await this.browserCompatibilityTester.runCompatibilityTests();
+            
+            // Report results to error handler
+            if (results.overall === 'incompatible') {
+                this.errorHandler?.reportWarning(`Browser compatibility: ${results.overall}`, {
+                    results,
+                    browserInfo: this.browserCompatibilityTester.browserInfo
+                });
+            } else if (results.overall === 'compatible_with_issues') {
+                this.errorHandler?.reportInfo(`Browser compatibility: ${results.overall}`, {
+                    results
+                });
+            } else {
+                this.errorHandler?.reportInfo('Browser fully compatible', {
+                    results
+                });
+            }
+            
+            // Show results in console
+            console.log('🔍 Browser compatibility test results:', results);
+            
+            // Generate and log report
+            const report = this.browserCompatibilityTester.generateCompatibilityReport();
+            console.log('📋 Browser Compatibility Report:\n', report);
+            
+        } catch (error) {
+            console.error('Error running browser compatibility tests:', error);
+            this.errorHandler?.reportWarning('Browser compatibility test execution failed', {
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Add mobile test button for touch devices
+     */
+    addMobileTestButton() {
+        // Only add if not already present
+        if (document.getElementById('mobile-test-button')) return;
+        
+        const button = document.createElement('button');
+        button.id = 'mobile-test-button';
+        button.innerHTML = '📱';
+        button.title = 'Run Mobile Tests';
+        button.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #2196f3;
+            color: white;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+            transition: all 0.3s ease;
+        `;
+        
+        button.addEventListener('click', () => this.runMobileTests());
+        
+        // Add hover effect
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'scale(1.1)';
+            button.style.boxShadow = '0 6px 16px rgba(33, 150, 243, 0.6)';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'scale(1)';
+            button.style.boxShadow = '0 4px 12px rgba(33, 150, 243, 0.4)';
+        });
+        
+        document.body.appendChild(button);
+    }
+
+    /**
+     * Add browser test button for desktop devices
+     */
+    addBrowserTestButton() {
+        // Only add if not already present
+        if (document.getElementById('browser-test-button')) return;
+        
+        const button = document.createElement('button');
+        button.id = 'browser-test-button';
+        button.innerHTML = '🔍';
+        button.title = 'Run Browser Compatibility Tests';
+        button.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #4caf50;
+            color: white;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+            transition: all 0.3s ease;
+        `;
+        
+        button.addEventListener('click', () => this.runBrowserCompatibilityTests());
+        
+        // Add hover effect
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'scale(1.1)';
+            button.style.boxShadow = '0 6px 16px rgba(76, 175, 80, 0.6)';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'scale(1)';
+            button.style.boxShadow = '0 4px 12px rgba(76, 175, 80, 0.4)';
+        });
+        
+        document.body.appendChild(button);
+    }
+
+    /**
+     * Handle initialization errors
+     */
+    async handleInitializationError(error) {
+        if (this.initializationAttempts < this.maxInitializationAttempts) {
+            console.log(`🔄 Reintentando inicialización... (${this.initializationAttempts}/${this.maxInitializationAttempts})`);
+            
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Clear any partial initialization
+            this.cleanup();
+            
+            // Retry initialization
+            return this.init();
+        } else {
+            // Max attempts reached
+            this.handleFatalError(error);
+        }
+    }
+
+    /**
+     * Handle fatal initialization errors
+     */
+    handleFatalError(error) {
+        console.error('🚨 Error fatal en la inicialización:', error);
+        console.error('Stack trace:', error.stack);
+        
+        // Show fatal error message with error details
+        this.showFatalErrorMessage(error);
+        
+        // Report to error handler if available
+        if (this.errorHandler) {
+            this.errorHandler.reportCriticalError(error, {
+                fatal: true,
+                attempts: this.initializationAttempts
+            });
+        }
+    }
+
+    /**
+     * Show fatal error message to user
+     */
+    showFatalErrorMessage(error = null) {
+        // Hide loading overlay
+        this.showLoading(false);
+        
+        // Get error details for debugging
+        const errorDetails = error ? {
+            message: error.message || 'Error desconocido',
+            name: error.name || 'Error',
+            stack: error.stack ? error.stack.split('\n').slice(0, 3).join('\n') : ''
+        } : null;
+        
+        // Create fatal error overlay
+        const errorOverlay = document.createElement('div');
+        errorOverlay.id = 'fatal-error-overlay';
+        errorOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10001;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+            padding: 20px;
+        `;
+        
+        let errorInfo = '';
+        if (errorDetails && this.initializationAttempts >= this.maxInitializationAttempts) {
+            errorInfo = `
+                <details style="margin-top: 20px; text-align: left; max-width: 400px;">
+                    <summary style="cursor: pointer; opacity: 0.8; font-size: 0.9rem;">Detalles técnicos</summary>
+                    <pre style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px; font-size: 0.8rem; overflow-x: auto; margin-top: 10px;">${errorDetails.message}</pre>
+                </details>
+            `;
+        }
+        
+        errorOverlay.innerHTML = `
+            <div style="max-width: 500px;">
+                <h1 style="font-size: 2.5rem; margin-bottom: 20px;">😔</h1>
+                <h2 style="font-size: 1.5rem; margin-bottom: 20px;">¡Ups! Algo salió mal</h2>
+                <p style="font-size: 1.1rem; margin-bottom: 30px; opacity: 0.9;">
+                    No pudimos cargar la aplicación correctamente después de ${this.initializationAttempts} intento(s). 
+                    Por favor, recarga la página para intentar de nuevo.
+                </p>
+                <button onclick="window.location.reload()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border: 2px solid white;
+                    color: white;
+                    padding: 15px 30px;
+                    border-radius: 50px;
+                    font-size: 1.1rem;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+                   onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    Recargar Página
+                </button>
+                ${errorInfo}
+                <p style="font-size: 0.9rem; margin-top: 20px; opacity: 0.7;">
+                    Si el problema persiste, verifica tu conexión a internet o abre la consola del navegador (F12) para más detalles.
+                </p>
+            </div>
+        `;
+        
+        document.body.appendChild(errorOverlay);
+    }
+
+    /**
+     * Set up application-level event listeners
+     */
+    setupApplicationEventListeners() {
+        // Page unload cleanup
+        window.addEventListener('beforeunload', this.handleUnload);
+        
+        // Visibility change handling
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        
+        // Online/offline status
+        window.addEventListener('online', () => {
+            this.errorHandler?.reportInfo('Conexión restaurada');
+        });
+        
+        window.addEventListener('offline', () => {
+            this.errorHandler?.reportWarning('Conexión perdida', { network: false });
+        });
+    }
+
+    /**
+     * Handle page visibility changes
+     */
+    handleVisibilityChange() {
+        if (document.hidden) {
+            // Page hidden - pause non-critical operations
+            this.audioSystem?.pause();
+            this.animationEngine?.pause();
+        } else {
+            // Page visible - resume operations
+            this.audioSystem?.resume();
+            this.animationEngine?.resume();
+        }
+    }
+
+    /**
+     * Check if a module is critical for application functionality
+     */
+    isCriticalModule(moduleName) {
+        const criticalModules = ['GameEngine', 'UIController'];
+        return criticalModules.includes(moduleName);
+    }
+
+    /**
+     * Get status of all modules
+     */
+    getModuleStatus() {
+        return {
+            lazyLoader: !!this.lazyLoader?.isInitialized,
+            errorHandler: !!this.errorHandler?.isInitialized,
+            cacheManager: !!this.cacheManager?.isInitialized,
+            audioSystem: !!this.audioSystem?.isInitialized,
+            dragDropHandler: !!this.dragDropHandler?.isInitialized,
+            timerManager: !!this.timerManager?.isInitialized,
+            uiController: !!this.uiController?.isInitialized,
+            calculatorModule: !!this.calculatorModule?.isInitialized,
+            animationEngine: !!this.animationEngine?.isInitialized,
+            dataStorage: !!this.dataStorage?.isInitialized,
+            gameEngine: !!this.gameEngine?.isInitialized,
+            mobileTestSuite: !!this.mobileTestSuite?.isInitialized,
+            browserCompatibilityTester: !!this.browserCompatibilityTester?.isInitialized
+        };
+    }
+
+    /**
+     * Create fallback modules for graceful degradation
+     */
+    
+    createFallbackAudioSystem() {
+        return {
+            isInitialized: true,
+            isEnabled: false,
+            playWelcome: () => {},
+            playDragSuccess: () => {},
+            playCalculation: () => {},
+            playAlert: () => {},
+            playCelebration: () => {},
+            playTick: () => {},
+            playUrgentTick: () => {},
+            setEnabled: () => {},
+            setVolume: () => {},
+            pause: () => {},
+            resume: () => {},
+            destroy: () => {}
+        };
+    }
+    
+    createFallbackDragDropHandler() {
+        return {
+            isInitialized: true,
+            onDropSuccess: null,
+            init: () => true,
+            createDragOptions: () => {},
+            resetDropZones: () => {},
+            setEnabled: () => {},
+            destroy: () => {}
+        };
+    }
+    
+    createFallbackTimerManager() {
+        return {
+            isInitialized: true,
+            onTimerComplete: null,
+            init: () => true,
+            startTimer: (duration, callback) => {
+                setTimeout(callback, duration * 1000);
+            },
+            stopTimer: () => {},
+            pauseTimer: () => {},
+            resumeTimer: () => {},
+            destroy: () => {}
+        };
+    }
+    
+    createFallbackUIController() {
+        return {
+            isInitialized: true,
+            init: () => true,
+            showScreen: (screenName) => {
+                const screens = document.querySelectorAll('.screen');
+                screens.forEach(s => s.classList.remove('active'));
+                const screen = document.getElementById(`${screenName}-screen`);
+                if (screen) screen.classList.add('active');
+            },
+            updateElement: (selector, content) => {
+                const element = document.querySelector(selector);
+                if (element) element.textContent = content;
+            },
+            showWarning: (message) => {
+                console.warn(message);
+            },
+            destroy: () => {}
+        };
+    }
+    
+    createFallbackCalculatorModule() {
+        return {
+            isInitialized: true,
+            init: () => true,
+            getCleaningOptions: () => [
+                { label: 'Básicos', value: 'basic', price: 25 },
+                { label: 'Estándar', value: 'standard', price: 45 }
+            ],
+            getWaterOptions: () => [
+                { label: 'Bajo', value: 'low', price: 15 },
+                { label: 'Medio', value: 'medium', price: 35 }
+            ],
+            calculateExpenses: () => ({
+                costs: { monthly: 60, annual: 720, cleaning: 45, water: 15 },
+                projections: { year10: { total: 7200 } },
+                pasteurAnalysis: { isWorthwhile: true, payback: { years: 3 } }
+            }),
+            destroy: () => {}
+        };
+    }
+    
+    createFallbackAnimationEngine() {
+        return {
+            isInitialized: true,
+            init: () => true,
+            transitionScreen: async (from, to) => {
+                const fromScreen = document.getElementById(`${from}-screen`);
+                const toScreen = document.getElementById(`${to}-screen`);
+                if (fromScreen) fromScreen.classList.remove('active');
+                if (toScreen) toScreen.classList.add('active');
+            },
+            showThinkingBrain: async (duration) => {
+                await new Promise(resolve => setTimeout(resolve, duration));
+            },
+            showConfetti: () => {},
+            fadeIn: () => {},
+            bounceElement: () => {},
+            pause: () => {},
+            resume: () => {},
+            destroy: () => {}
+        };
+    }
+    
+    createFallbackDataStorage() {
+        return {
+            isInitialized: true,
+            init: () => true,
+            storeUserInput: () => {},
+            storeCalculation: () => {},
+            clearAll: () => {},
+            destroy: () => {}
+        };
+    }
+
+    /**
+     * Show/hide loading overlay
+     */
+    showLoading(show) {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            if (show) {
+                loadingOverlay.classList.remove('hidden');
+            } else {
+                loadingOverlay.classList.add('hidden');
+            }
+        }
+    }
+
+    /**
+     * Clean up resources before page unload
+     */
+    handleUnload() {
+        console.log('🧹 Cleaning up application resources...');
+        this.cleanup();
+    }
+
+    /**
+     * Cleanup all modules
+     */
+    cleanup() {
+        const modules = [
+            'gameEngine', 'audioSystem', 'dragDropHandler', 'timerManager',
+            'uiController', 'calculatorModule', 'animationEngine', 'dataStorage',
+            'mobileTestSuite', 'browserCompatibilityTester', 'cacheManager'
+        ];
+
+        modules.forEach(moduleName => {
+            try {
+                if (this[moduleName]?.destroy) {
+                    this[moduleName].destroy();
+                }
+                this[moduleName] = null;
+            } catch (error) {
+                console.warn(`Error cleaning up ${moduleName}:`, error);
+            }
+        });
+
+        // Cleanup error handler
+        try {
+            if (this.errorHandler?.destroy) {
+                this.errorHandler.destroy();
+            }
+            this.errorHandler = null;
+        } catch (error) {
+            console.warn('Error cleaning up ErrorHandler:', error);
+        }
+
+        // Cleanup lazy loader last
+        try {
+            if (this.lazyLoader?.destroy) {
+                this.lazyLoader.destroy();
+            }
+            this.lazyLoader = null;
+        } catch (error) {
+            console.warn('Error cleaning up LazyLoader:', error);
+        }
+
+        this.isInitialized = false;
+    }
+
+    /**
+     * Get application status
+     */
+    getStatus() {
+        return {
+            initialized: this.isInitialized,
+            initializationAttempts: this.initializationAttempts,
+            modules: this.getModuleStatus(),
+            errorStats: this.errorHandler?.getErrorStats() || null,
+            mobileTestSuite: !!this.mobileTestSuite?.isInitialized,
+            browserCompatibilityTester: !!this.browserCompatibilityTester?.isInitialized
+        };
+    }
+
+    /**
+     * Export debug information
+     */
+    exportDebugInfo() {
+        return {
+            status: this.getStatus(),
+            lazyLoadingStats: this.lazyLoader?.getLoadingStats() || 'No lazy loader',
+            cacheStats: this.cacheManager?.getStatistics() || 'No cache manager',
+            calculatorCacheStats: this.calculatorModule?.getCacheStatistics() || 'No calculator cache',
+            errorLogs: this.errorHandler?.exportErrorLogs() || 'No error handler',
+            mobileTestResults: this.mobileTestSuite?.testResults || 'No mobile test suite',
+            browserCompatibilityResults: this.browserCompatibilityTester?.testResults || 'No browser compatibility tester',
+            browserInfo: this.browserCompatibilityTester?.browserInfo || 'No browser info',
+            userAgent: navigator.userAgent,
+            timestamp: new Date().toISOString(),
+            url: window.location.href
+        };
+    }
+}
+
+/**
+ * Initialize application when DOM is ready
+ */
+async function initializeApp() {
+    // Wait for DOM to be fully ready
+    if (document.readyState === 'loading') {
+        await new Promise(resolve => {
+            document.addEventListener('DOMContentLoaded', resolve, { once: true });
+        });
+    }
+    
+    // Wait a bit more to ensure CSS is loaded and DOM is fully rendered
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    console.log('📄 DOM loaded, starting application...');
+    
+    try {
+        // Create and initialize the application
+        window.calculadoraApp = new CalculadoraApp();
+        await window.calculadoraApp.init();
+    } catch (error) {
+        console.error('🚨 CRITICAL ERROR during application initialization:', error);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        // Show user-friendly error message
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'critical-init-error';
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10002;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+            padding: 20px;
+        `;
+        
+        errorDiv.innerHTML = `
+            <div style="max-width: 600px;">
+                <h1 style="font-size: 2.5rem; margin-bottom: 20px;">😔</h1>
+                <h2 style="font-size: 1.5rem; margin-bottom: 20px;">Error de Inicialización</h2>
+                <p style="font-size: 1.1rem; margin-bottom: 20px; opacity: 0.9;">
+                    ${error.message || 'Error desconocido durante la inicialización'}
+                </p>
+                <details style="margin-top: 20px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;">
+                    <summary style="cursor: pointer; opacity: 0.8; font-size: 0.9rem; margin-bottom: 10px;">Detalles técnicos (click para expandir)</summary>
+                    <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 5px; font-size: 0.8rem; overflow-x: auto; text-align: left; white-space: pre-wrap; word-wrap: break-word;">${error.stack || error.toString()}</pre>
+                </details>
+                <button onclick="window.location.reload()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border: 2px solid white;
+                    color: white;
+                    padding: 15px 30px;
+                    border-radius: 50px;
+                    font-size: 1.1rem;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    margin-top: 20px;
+                " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+                   onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    Recargar Página
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(errorDiv);
+    }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    // DOM is already ready
+    initializeApp();
+}
+
+/**
+ * Export for potential external access
+ */
+export { CalculadoraApp };

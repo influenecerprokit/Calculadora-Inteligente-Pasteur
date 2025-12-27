@@ -1,0 +1,644 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Calculadora Gastos">
+    <meta name="theme-color" content="#667eea">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Calculadora de Gastos - Juego Interactivo</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Iconos para PWA -->
+    <link rel="icon" type="image/png" href="styles/Logo/d856f2_cf6bc381d9fb47c6ad407ae5095cc914~mv2.png">
+    <link rel="apple-touch-icon" href="styles/Logo/d856f2_cf6bc381d9fb47c6ad407ae5095cc914~mv2.png">
+    
+    <link rel="stylesheet" href="styles/main.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <!-- Main Game Container -->
+    <main id="game-container" class="game-container">
+        <!-- Screen Container for transitions -->
+        <section id="screen-container" class="screen-container">
+            <!-- User Name Display -->
+            <div id="user-name-display" class="user-name-display hidden"></div>
+            
+            <!-- Initial Welcome Screen (Pantalla Principal 1) -->
+            <div id="initial-welcome-screen" class="screen active" data-screen="initial-welcome">
+                <header class="screen-header">
+                    <h1 class="animated-title" style="font-size: 1.8rem; line-height: 1.3;">
+                        🎯 Calculadora<br>Inteligente de Gastos
+                    </h1>
+                </header>
+                <div class="screen-content">
+                    <div class="logo-container">
+                        <img src="styles/Logo/d856f2_cf6bc381d9fb47c6ad407ae5095cc914~mv2.png" alt="Logo" class="main-logo">
+                    </div>
+                    <div class="name-input-container">
+                        <label for="user-name-input" class="name-input-label">Ingrese su nombre</label>
+                        <input type="text" id="user-name-input" class="name-input" placeholder="Escriba su nombre aquí" maxlength="50">
+                    </div>
+                    <div class="gender-selector-container">
+                        <label class="gender-selector-label">Seleccione:</label>
+                        <div class="gender-options">
+                            <button type="button" class="gender-option" data-gender="hombre">Hombre</button>
+                            <button type="button" class="gender-option" data-gender="mujer">Mujer</button>
+                            <button type="button" class="gender-option" data-gender="familia">Familia</button>
+                        </div>
+                    </div>
+                    <button id="initial-welcome-button" class="primary-button welcome-button">
+                        👉 BIENVENIDOS
+                    </button>
+                </div>
+            </div>
+
+            <!-- Welcome Screen (Pantalla Principal 2) -->
+            <div id="welcome-screen" class="screen" data-screen="welcome">
+                <button class="back-button" data-back-to="initial-welcome">←</button>
+                <header class="screen-header">
+                    <h1 id="welcome-title" class="animated-title">👋 Hola</h1>
+                </header>
+                <div class="screen-content">
+                    <div class="welcome-text">
+                        <p class="welcome-question">¿Estás listo para descubrir cuánto dinero estás gastando realmente en productos de limpieza y agua poco saludable?</p>
+                        <p class="welcome-time">⏱️ Solo te tomará unos segundos.</p>
+                    </div>
+                    <button id="start-button" class="primary-button welcome-button">
+                        👉 SÍ, QUIERO SABER
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rules Screen -->
+            <div id="rules-screen" class="screen" data-screen="rules">
+                <button class="back-button" data-back-to="welcome">←</button>
+                <header class="screen-header">
+                    <h2>🕹️ El reto comienza</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="rules-content">
+                        <p class="rules-main-text">
+                            Tendrás 15 segundos para elegir el precio aproximado de los productos que usas actualmente.
+                        </p>
+                        <div class="rules-instructions">
+                            <p class="instruction-item">👉 No tiene que ser exacto.</p>
+                            <p class="instruction-item">👉 Solo elige la opción que más se acerque a tu realidad.</p>
+                        </div>
+                        <p class="rules-question">¿Preparado?</p>
+                    </div>
+                    <button id="rules-continue" class="primary-button rules-button">
+                        🚀 SÍ, EMPEZAR
+                    </button>
+                </div>
+            </div>
+
+            <!-- Countdown Screen -->
+            <div id="countdown-screen" class="screen" data-screen="countdown">
+                <button class="back-button" data-back-to="rules">←</button>
+                <div class="countdown-display">
+                    <div id="countdown-number" class="countdown-number">3</div>
+                </div>
+            </div>
+
+            <!-- Price Screen -->
+            <div id="price-screen" class="screen" data-screen="price">
+                <button class="back-button" data-back-to="countdown">←</button>
+                <header class="screen-header">
+                    <h2 id="price-question">¿Cuál es el costo del producto que usas?</h2>
+                    <div id="product-name" class="product-name">
+                        <span class="product-emoji"></span>
+                        <span class="product-name-text"></span>
+                    </div>
+                    <div id="price-instruction" class="instruction-text">👉 Selecciona el precio que más se acerca</div>
+                </header>
+                <div class="screen-content">
+                    <div id="timer-display" class="timer-display">
+                        <span id="timer-seconds">15</span>s
+                    </div>
+                    <div id="drag-options" class="drag-options">
+                        <!-- Las opciones de precios se generan dinámicamente -->
+                    </div>
+                    <div id="drop-zone" class="drop-zone">
+                        <span class="drop-zone-text">👉 Selecciona tu respuesta</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quantity Screen -->
+            <div id="quantity-screen" class="screen" data-screen="quantity">
+                <button class="back-button" data-back-to="price">←</button>
+                <header class="screen-header">
+                    <h2 id="quantity-question">¿Cuántas unidades compras al mes?</h2>
+                </header>
+                <div class="screen-content">
+                    <div id="quantity-timer-display" class="timer-display">
+                        <span id="quantity-timer-seconds">15</span>s
+                    </div>
+                    <div id="quantity-options" class="drag-options">
+                        <!-- Las opciones de cantidad se generan dinámicamente -->
+                    </div>
+                    <div id="quantity-drop-zone" class="drop-zone">
+                        <span class="drop-zone-text">👉 Selecciona tu respuesta</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cleaning Products Result Screen -->
+            <div id="cleaning-result-screen" class="screen" data-screen="cleaning-result">
+                <button class="back-button" data-back-to="quantity">←</button>
+                <header class="screen-header">
+                    <h2>🧹 Resultado de Productos de Limpieza</h2>
+                </header>
+                <div class="screen-content">
+                    <div id="cleaning-thinking" class="thinking-animation">
+                        <div class="brain-icon">🧠</div>
+                        <div class="thinking-text">➡️ Sumando tus gastos en productos de limpieza...</div>
+                    </div>
+                    <div id="cleaning-calculation-result" class="calculation-result hidden">
+                        <div class="result-alert-orange">
+                            <p class="result-title-orange">🧹 Tus gastos mensuales en productos de limpieza son:</p>
+                            <div class="alert-box-orange">
+                                <span class="currency-orange">💰 $</span>
+                                <span id="cleaning-total-amount" class="amount-orange">0.00</span>
+                            </div>
+                        </div>
+                        <button id="cleaning-continue-button" class="cleaning-continue-button hidden">👉 Continuar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Water Type Screen -->
+            <div id="water-type-screen" class="screen" data-screen="water-type">
+                <button class="back-button" data-back-to="cleaning-result">←</button>
+                <header class="screen-header">
+                    <h2 id="water-type-title">💧 Ahora hablemos del agua que consumes</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="water-question">
+                        <p class="question-text">¿Qué tipo de agua bebes actualmente?</p>
+                    </div>
+                    <div id="water-type-options" class="drag-options">
+                        <!-- Las opciones de tipo de agua se generan dinámicamente -->
+                    </div>
+                    <div id="water-type-drop-zone" class="drop-zone">
+                        <span class="drop-zone-text">👉 Selecciona tu respuesta</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Water Warning Screen -->
+            <div id="water-warning-screen" class="screen" data-screen="water-warning">
+                <button class="back-button" data-back-to="water-type">←</button>
+                <header class="screen-header">
+                    <h2>⚠️ Advertencia</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="warning-icon">❌</div>
+                    <div id="warning-messages" class="warning-messages">
+                        <p class="warning-message active">⚠️ Peligro invisible: el agua del grifo puede contener cloro, sedimentos y metales pesados.</p>
+                        <p class="warning-message">⚠️ Riesgo silencioso: tuberías antiguas liberan óxido y plomo.</p>
+                        <p class="warning-message">⚠️ El cloro no lo elimina todo: bacterias y quistes pueden llegar a tu cuerpo.</p>
+                        <p class="warning-message">⚠️ Por su salud, a mediano y largo plazo. Le recomiendo tomar, desde ya mismo, una medida contra esta situación. Recuerde: lo que no se corrige hoy, el cuerpo lo cobra mañana.</p>
+                    </div>
+                    <button id="warning-continue-button" class="primary-button warning-continue-button hidden">👉 Continuar</button>
+                </div>
+            </div>
+
+            <!-- Water Simulation Screen -->
+            <div id="water-simulation-screen" class="screen" data-screen="water-simulation">
+                <button class="back-button" data-back-to="water-warning">←</button>
+                <header class="screen-header">
+                    <h2>💧 Simulación de Gastos</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="water-question">
+                        <p id="water-simulation-text" class="question-text">No se preocupe, usted hoy tiene la solución en sus manos, así que hagamos una simulación de gastos de agua.</p>
+                    </div>
+                    <button id="water-simulation-button" class="primary-button welcome-button">
+                        👉 Adelante
+                    </button>
+                </div>
+            </div>
+
+            <!-- Water Frequency Screen -->
+            <div id="water-frequency-screen" class="screen" data-screen="water-frequency">
+                <button class="back-button" data-back-to="water-simulation">←</button>
+                <header class="screen-header">
+                    <h2>Frecuencia de compra por semana</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="water-question">
+                        <p class="question-text">¿Cuántas veces compras agua a la semana?</p>
+                    </div>
+                    <div id="water-frequency-options" class="drag-options">
+                        <!-- Las opciones de frecuencia se generan dinámicamente -->
+                    </div>
+                    <div id="water-frequency-drop-zone" class="drop-zone">
+                        <span class="drop-zone-text">👉 Selecciona tu respuesta</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Water Price Screen -->
+            <div id="water-price-screen" class="screen" data-screen="water-price">
+                <button class="back-button" data-back-to="water-frequency">←</button>
+                <header class="screen-header">
+                    <h2>💧 Precio del agua</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="water-question">
+                        <p class="question-text">¿Cuánto pagas por cada compra?</p>
+                    </div>
+                    <div id="water-price-options" class="drag-options">
+                        <!-- Las opciones de precio se generan dinámicamente -->
+                    </div>
+                    <div id="water-price-drop-zone" class="drop-zone">
+                        <span class="drop-zone-text">👉 Selecciona tu respuesta</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Water Result Screen -->
+            <div id="water-result-screen" class="screen" data-screen="water-result">
+                <button class="back-button" data-back-to="water-price">←</button>
+                <header class="screen-header">
+                    <h2>💧 Resultado del agua</h2>
+                </header>
+                <div class="screen-content">
+                    <div id="water-thinking" class="thinking-animation">
+                        <div class="brain-icon">🧠</div>
+                        <div class="thinking-text">➡️ Sumando solo los gastos del agua.</div>
+                    </div>
+                    <div id="water-calculation-result" class="calculation-result hidden">
+                        <div class="result-alert-orange">
+                            <p class="result-title-orange">🧹 Tus gastos mensuales en agua son:</p>
+                            <div class="alert-box-orange">
+                                <span class="currency-orange">💰 $</span>
+                                <span id="water-total-amount" class="amount-orange">0.00</span>
+                            </div>
+                        </div>
+                        <button id="water-continue-button" class="cleaning-continue-button hidden">👉 Continuar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Screen -->
+            <div id="results-screen" class="screen" data-screen="results">
+                <button class="back-button" data-back-to="water-result">←</button>
+                <header class="screen-header">
+                    <h2 id="results-title">Calculando...</h2>
+                </header>
+                <div class="screen-content">
+                    <div id="thinking-animation" class="thinking-animation">
+                        <div class="brain-icon">🧠</div>
+                        <div class="thinking-text">➡️ Sumando tus gastos generales...</div>
+                        <div class="thinking-dots">
+                            <span>.</span><span>.</span><span>.</span>
+                        </div>
+                    </div>
+                    <div id="calculation-result" class="calculation-result hidden">
+                        <div class="alert-maximum-container">
+                            <div class="red-lights"></div>
+                            <div class="result-alert-maximum">
+                                <p class="alert-warning-text">⚠️ Tus gastos mensuales superan los estándares normales de consumo.</p>
+                                <p class="result-title-maximum">💰 Gastos totales mensuales:</p>
+                                <div class="alert-box-maximum">
+                                    <span class="currency-maximum">$</span>
+                                    <span id="total-amount" class="amount-maximum">0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="results-continue-button" class="cleaning-continue-button hidden">👉 Continuar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multiplier Screen -->
+            <div id="multiplier-screen" class="screen" data-screen="multiplier">
+                <button class="back-button" data-back-to="results">←</button>
+                <header class="screen-header">
+                    <h2>🔢 Multiplicador</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="multiplier-question">
+                        <p class="question-text">¿Elige por cuántos meses?</p>
+                    </div>
+                    <div class="multiplier-container">
+                        <div class="multiplier-display">
+                            <span id="multiplier-value" class="multiplier-value">12</span>
+                            <span class="multiplier-label">meses</span>
+                        </div>
+                        <input type="range" id="multiplier-slider" class="multiplier-slider" min="1" max="12" value="12" step="1">
+                        <div class="multiplier-labels">
+                            <span>1</span>
+                            <span>6</span>
+                            <span>12</span>
+                        </div>
+                    </div>
+                    <div class="multiplier-calculation">
+                        <p class="calculation-text">📊 Total acumulado:</p>
+                        <div class="alert-box-maximum">
+                            <span class="currency-maximum">$</span>
+                            <span id="multiplied-total" class="amount-maximum">0.00</span>
+                        </div>
+                    </div>
+                    <button id="multiplier-continue" class="primary-button multiplier-button">
+                        Continuar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Years Multiplier Screen -->
+            <div id="years-multiplier-screen" class="screen" data-screen="years-multiplier">
+                <button class="back-button" data-back-to="multiplier">←</button>
+                <header class="screen-header">
+                    <h2>🔢 Multiplicador de Años</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="multiplier-question">
+                        <p class="question-text">¿Durante cuántos años aproximadamente será este gasto?</p>
+                    </div>
+                    <div class="multiplier-container">
+                        <div class="multiplier-display">
+                            <span id="years-multiplier-value" class="multiplier-value">1</span>
+                            <span class="multiplier-label">años</span>
+                        </div>
+                        <input type="range" id="years-multiplier-slider" class="multiplier-slider" min="1" max="100" value="1" step="1">
+                        <div class="multiplier-labels">
+                            <span>1</span>
+                            <span>50</span>
+                            <span>100</span>
+                        </div>
+                    </div>
+                    <button id="years-multiplier-continue" class="primary-button multiplier-button">
+                        Continuar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Years Result Screen -->
+            <div id="years-result-screen" class="screen" data-screen="years-result">
+                <button class="back-button" data-back-to="years-multiplier">←</button>
+                <header class="screen-header">
+                    <h2 id="years-result-title">Calculando...</h2>
+                </header>
+                <div class="screen-content">
+                    <div id="years-thinking-animation" class="thinking-animation">
+                        <div class="brain-icon">🧠</div>
+                        <div id="years-thinking-text" class="thinking-text">➡️ Calculando sus gastos por 1 año...</div>
+                        <div class="thinking-dots">
+                            <span>.</span><span>.</span><span>.</span>
+                        </div>
+                    </div>
+                    <div id="years-calculation-result" class="calculation-result hidden">
+                        <div class="alert-maximum-container">
+                            <div class="red-lights"></div>
+                            <div class="result-alert-maximum">
+                                <p class="alert-warning-text">⚠️ Tus gastos acumulados superan los estándares normales de consumo.</p>
+                                <p class="result-title-maximum">💰 Gasto total acumulado:</p>
+                                <div class="alert-box-maximum">
+                                    <span class="currency-maximum">$</span>
+                                    <span id="years-total-amount" class="amount-maximum">0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="years-result-continue-button" class="cleaning-continue-button hidden">👉 Continuar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation Screen -->
+            <div id="validation-screen" class="screen" data-screen="validation">
+                <button class="back-button" data-back-to="years-result">←</button>
+                <header class="screen-header">
+                    <h2>🚨 Confirmación</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="validation-message">
+                        <p class="validation-question">⚠️ ¿Seguro que los montos de precios ingresados, reflejan el aproximado de tus gastos al mes?</p>
+                    </div>
+                    <div class="validation-options">
+                        <button id="validation-yes" class="validation-button yes">✔️ SÍ</button>
+                        <button id="validation-no" class="validation-button no">❌ NO</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation Review Modal -->
+            <div id="validation-review-modal" class="modal-overlay hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>⚠️ Revisar Precios</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p id="validation-review-modal-text">Ok, revisemos de nuevo tus precios</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="validation-review-accept" class="modal-button accept">Aceptar</button>
+                        <button id="validation-review-cancel" class="modal-button cancel">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Screen -->
+            <div id="analysis-screen" class="screen" data-screen="analysis">
+                <button class="back-button" data-back-to="validation">←</button>
+                <header class="screen-header">
+                    <h2>Analizando...</h2>
+                </header>
+                <div class="screen-content">
+                    <div id="analysis-thinking-animation" class="thinking-animation">
+                        <div class="brain-icon">🧠</div>
+                        <div id="analysis-thinking-text" class="thinking-text">➡️ Analizando tu situación...</div>
+                        <div class="thinking-dots">
+                            <span>.</span><span>.</span><span>.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prize Screen -->
+            <div id="prize-screen" class="screen" data-screen="prize">
+                <button class="back-button" data-back-to="analysis">←</button>
+                <header class="screen-header">
+                    <h1 class="prize-title">🎉 ¡FELICIDADES!</h1>
+                </header>
+                <div class="screen-content">
+                    <div id="confetti-container" class="confetti-container"></div>
+                    <div class="prize-content">
+                        <div class="prize-message">
+                            <p class="prize-main-text">
+                                Has calificado para recibir <strong>GRATIS</strong> la dotación de todos los productos evaluados, durante <strong>5 AÑOS consecutivos</strong>. Todo esto incluidos con la adquisición del <strong>Purificador de Agua Pasteur Water System</strong>.
+                            </p>
+                            <p class="prize-question-text">
+                                ¿Al comenzar desde hoy mismo lo haría por ?
+                            </p>
+                        </div>
+                        <div class="prize-benefits">
+                            <div class="benefit-item" id="benefit-ahorro" data-benefit="ahorro">
+                                <span class="benefit-icon">💧</span>
+                                <span class="benefit-text">Ahorro</span>
+                            </div>
+                            <div class="benefit-item" id="benefit-salud" data-benefit="salud">
+                                <span class="benefit-icon">💧</span>
+                                <span class="benefit-text">Salud</span>
+                            </div>
+                            <div class="benefit-item" id="benefit-tranquilidad" data-benefit="tranquilidad">
+                                <span class="benefit-icon">💧</span>
+                                <span class="benefit-text">Tranquilidad</span>
+                            </div>
+                        </div>
+                        <button id="prize-continue" class="primary-button prize-accept-button">
+                            Quiero mejorar mi agua
+                        </button>
+                    </div>
+                    <div class="tank-image-container">
+                        <img src="styles/tanque/479bf1_05ef7700946d43d7a32166d486d18115f000.avif" alt="Tanque" class="tank-image">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Benefit Detail Screens -->
+            <!-- Ahorro Detail Screen -->
+            <div id="benefit-ahorro-screen" class="screen" data-screen="benefit-ahorro">
+                <button class="back-button" data-back-to="prize">←</button>
+                <header class="screen-header">
+                    <h2>💧 Ahorro</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="benefit-tank-logo">
+                        <img src="styles/tanque completo/1000475288.png" alt="Tanque completo" class="benefit-tank-image">
+                    </div>
+                    <div class="benefit-detail-message">
+                        <p class="benefit-detail-text">
+                            Invertir una sola vez para dejar de pagar agua embotellada todos los meses. Tu cerebro percibe control financiero y menor gasto futuro.
+                        </p>
+                    </div>
+                    <button id="benefit-ahorro-back" class="primary-button prize-accept-button">
+                        Felicidades! 🎉
+                    </button>
+                </div>
+            </div>
+
+            <!-- Salud Detail Screen -->
+            <div id="benefit-salud-screen" class="screen" data-screen="benefit-salud">
+                <button class="back-button" data-back-to="prize">←</button>
+                <header class="screen-header">
+                    <h2>💧 Salud</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="benefit-tank-logo">
+                        <img src="styles/tanque completo/1000475288.png" alt="Tanque completo" class="benefit-tank-image">
+                    </div>
+                    <div class="benefit-detail-message">
+                        <p class="benefit-detail-text">
+                            Agua libre de contaminantes que tu cuerpo reconoce como segura. Menos carga tóxica, más energía y bienestar a largo plazo.
+                        </p>
+                    </div>
+                    <button id="benefit-salud-back" class="primary-button prize-accept-button">
+                        Felicidades! 🎉
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tranquilidad Detail Screen -->
+            <div id="benefit-tranquilidad-screen" class="screen" data-screen="benefit-tranquilidad">
+                <button class="back-button" data-back-to="prize">←</button>
+                <header class="screen-header">
+                    <h2>💧 Tranquilidad</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="benefit-tank-logo">
+                        <img src="styles/tanque completo/1000475288.png" alt="Tanque completo" class="benefit-tank-image">
+                    </div>
+                    <div class="benefit-detail-message">
+                        <p class="benefit-detail-text">
+                            La certeza diaria de que tú y tu familia beben agua confiable sin preocuparse por lo invisible. Descanso mental automático.
+                        </p>
+                    </div>
+                    <button id="benefit-tranquilidad-back" class="primary-button prize-accept-button">
+                        Felicidades! 🎉
+                    </button>
+                </div>
+            </div>
+
+            <!-- Specialist Contact Screen -->
+            <div id="specialist-screen" class="screen" data-screen="specialist">
+                <button class="back-button" data-back-to="prize">←</button>
+                <header class="screen-header">
+                    <h2>🎉 Felicidades</h2>
+                </header>
+                <div class="screen-content">
+                    <div class="logo-container">
+                        <img src="styles/Logo/d856f2_cf6bc381d9fb47c6ad407ae5095cc914~mv2.png" alt="Logo" class="main-logo">
+                    </div>
+                    <div class="specialist-message">
+                        <p class="specialist-text">
+                            Felicidades, nuestros especialistas le ayudarán en todo desde ya mismo.
+                        </p>
+                    </div>
+                    <button id="view-summary-button" class="primary-button">
+                        Ver Resumen de Gastos
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary Screen -->
+            <div id="summary-screen" class="screen" data-screen="summary">
+                <button class="back-button" data-back-to="specialist">←</button>
+                <header class="screen-header">
+                    <h2>📊 Resumen de Gastos</h2>
+                </header>
+                <div class="screen-content summary-content">
+                    <div id="summary-table-container" class="summary-table-container">
+                        <!-- La tabla se generará dinámicamente -->
+                    </div>
+                    <button id="download-pdf-button" class="primary-button download-button">
+                        📥 Descargar PDF
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Audio Elements -->
+        <div id="audio-container" class="audio-container hidden">
+            <!-- Audio will be managed via Web Audio API -->
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <p>Cargando...</p>
+        </div>
+
+    </main>
+
+    <!-- JavaScript - Versión Simplificada y Funcional -->
+    <script src="JS/app.js"></script>
+    
+    <!-- Service Worker Registration para PWA -->
+    <script>
+        // Registrar el Service Worker para modo offline
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('✅ Service Worker registrado exitosamente:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('❌ Error al registrar Service Worker:', error);
+                    });
+            });
+        } else {
+            console.log('⚠️ Este navegador no soporta Service Workers');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "Calculadora Inteligente de Gastos - Pasteur",
+  "short_name": "Calculadora Gastos",
+  "description": "Calculadora interactiva para calcular gastos en productos de limpieza y agua",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
+  "scope": "./",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "styles/Logo/d856f2_cf6bc381d9fb47c6ad407ae5095cc914~mv2.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "styles/Logo/d856f2_cf6bc381d9fb47c6ad407ae5095cc914~mv2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
